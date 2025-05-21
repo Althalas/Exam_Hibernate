@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+        "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+        "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+    <session-factory>
+        <property name="jakarta.persistence.jdbc.driver">com.mysql.cj.jdbc.Driver</property>
+        <property name="jakarta.persistence.jdbc.url">jdbc:mysql://mysql:3306/testdb?useSSL=false&amp;allowPublicKeyRetrieval=true</property>
+        <property name="jakarta.persistence.jdbc.user">root</property>
+        <property name="jakarta.persistence.jdbc.password">root</property>
+
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQLDialect</property>
+        <property name="hibernate.hbm2ddl.auto">update</property>
+
+
+        <property name="hibernate.show_sql">true</property>
+        <property name="hibernate.format_sql">true</property>
+        <mapping class="com.humanbooster.model.Utilisateur"/>
+        <mapping class="com.humanbooster.model.BorneRecharge"/>
+        <mapping class="com.humanbooster.model.LieuRecharge"/>
+        <mapping class="com.humanbooster.model.Reservation"/>
+    </session-factory>
+</hibernate-configuration>
