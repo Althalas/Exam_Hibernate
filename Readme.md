@@ -8,14 +8,50 @@ Le projet est structuré comme un projet Maven standard :
 
 * **pom.xml**: Fichier de configuration Maven qui gère les dépendances du projet (Hibernate, connecteur de base de données, etc.) et la configuration du build.  
 * **src/main/java/**: Contient le code source Java de l'application.  
-  * com/example/entity/ (ou com/humanbooster/model/ selon votre structure) : Classes d'entités JPA (Utilisateur, LieuRecharge, BorneRecharge, Reservation, et les énumérations EtatBorne, RoleUtilisateur, StatutReservation).  
-  * com/example/dao/ (ou com/humanbooster/DAO/ ou com/humanbooster/dao/): Interfaces DAO définissant les contrats pour les opérations de persistance.  
-  * com/example/dao/impl/ (ou com/humanbooster/DAO/impl/ ou com.humanbooster/dao/impl/): Implémentations concrètes des interfaces DAO utilisant Hibernate.  
-  * com/example/util/ (ou com/humanbooster/util/): Classes utilitaires, notamment HibernateFactoryManager.java pour la gestion de la SessionFactory.  
-  * com/example/Main.java (ou com.humanbooster/App.java): Classe principale contenant la méthode main pour lancer des démonstrations ou l'application.  
+  * com/humanbooster/model : Classes d'entités JPA (Utilisateur, LieuRecharge, BorneRecharge, Reservation, et les énumérations EtatBorne, RoleUtilisateur, StatutReservation).  
+  * com/humanbooster/DAO : Interfaces DAO définissant les contrats pour les opérations de persistance et implémentations concrètes des interfaces DAO utilisant Hibernate.
+  * com/humanbooster/DAO/GestionnaireSessionFactory : Classes utilitaires, notamment GestionnaireSessionFactory.java pour la gestion de la SessionFactory.  
+  * com/humanbooster/App.java : Classe principale contenant la méthode main pour lancer des démonstrations ou l'application.  
 * **src/main/resources/**: Contient les fichiers de configuration.  
-  * hibernate.cfg.xml: Fichier de configuration principal d'Hibernate (connexion base de données, dialecte, mapping des entités, etc.).  
-  * (Optionnel) log4j2.xml ou logback.xml si une configuration de logging plus avancée est utilisée.
+  * hibernate.cfg.xml: Fichier de configuration principal d'Hibernate (connexion base de données, dialecte, mapping des entités, etc.).
+ 
+## **Explication des Choix Techniques**
+
+* **Langage et Plateforme :** Java (JDK 11+) a été choisi pour sa robustesse, son écosystème mature et sa portabilité.  
+* **Gestion de Projet et Dépendances :** Apache Maven est utilisé pour structurer le projet, gérer les dépendances (Hibernate, pilote JDBC MySQL, etc.) et faciliter le processus de build.  
+* **ORM (Object-Relational Mapping) :** Hibernate (version 5.6.x) a été sélectionné comme framework ORM. Il simplifie l'interaction avec la base de données en mappant les objets Java à des tables relationnelles, réduisant ainsi la quantité de code SQL "boilerplate" à écrire. Il offre également des fonctionnalités avancées comme la gestion du cache et le chargement paresseux (lazy loading).  
+* **API de Persistance :** JPA (Java Persistence API) est utilisé via les annotations (@Entity, @Table, @Id, @Column, @ManyToOne, @OneToMany, etc.) pour définir le mapping des entités. Hibernate est une implémentation de JPA.  
+* **Base de Données :** MySQL (version 8+) est utilisée comme système de gestion de base de données relationnelle, conformément aux indications des logs d'exécution. La connexion est configurée dans hibernate.cfg.xml. Pour le développement et les tests, une stratégie hibernate.hbm2ddl.auto=create-drop est employée pour recréer le schéma à chaque lancement, garantissant un environnement propre.  
+* **Pattern DAO (Data Access Object) :** La couche d'accès aux données est structurée selon le pattern DAO. Pour chaque entité, une interface DAO définit les opérations de persistance, et une classe d'implémentation concrète fournit la logique utilisant Hibernate. Cela permet de découpler la logique métier de la technologie de persistance.  
+* **Gestion de la SessionFactory :** Une classe utilitaire (GestionnaireSessionFactory) est responsable de la création et de la fourniture de l'unique instance de SessionFactory, qui est un objet coûteux à créer. Les DAO obtiennent la SessionFactory de ce gestionnaire et ouvrent/ferment les Session Hibernate pour chaque transaction.  
+* **Gestion des Transactions :** Les opérations de modification de données (sauvegarde, mise à jour, suppression) sont encapsulées dans des transactions Hibernate pour garantir l'atomicité et la cohérence des données. Un rollback est effectué en cas d'erreur.  
+* **Chargement des Collections :** Les collections liées (relations @OneToMany, @ManyToMany) sont configurées avec FetchType.LAZY par défaut pour optimiser les performances en ne chargeant les données associées que lorsque c'est explicitement nécessaire. Pour éviter les LazyInitializationException lors d'accès en dehors d'une session active (par exemple, dans les méthodes toString() ou dans la couche de présentation/service), des stratégies de chargement explicite comme JOIN FETCH dans les requêtes HQL sont utilisées dans les DAO lorsque pertinent (par exemple, dans les méthodes findAll qui sont susceptibles d'être utilisées pour un affichage complet).
+
+## **Résultat Attendu des Méthodes DAO Testées (dans App.java)**
+
+La classe App.java a pour objectif de démontrer le bon fonctionnement des opérations CRUD (Create, Read, Update, Delete) de base pour chaque entité via leurs DAO respectifs.
+
+Pour chaque entité (Utilisateur, LieuRecharge, BorneRecharge, Reservation), on s'attend aux résultats suivants lors de l'exécution de App.java :
+
+1. **Création (Save/SaveOrUpdate) :**  
+   * **Attendu :** De nouvelles instances d'entités sont créées et persistées en base de données. Après l'appel à saveOrUpdate(), les objets Java devraient se voir assigner un ID auto-généré par la base de données (si @GeneratedValue(strategy \= GenerationType.IDENTITY) est utilisé). Les logs Hibernate devraient afficher les requêtes INSERT correspondantes. Un message de confirmation de sauvegarde/mise à jour est affiché sur la console.  
+   * **Vérification :** Consultation de la base de données MySQL pour confirmer la présence des nouvelles lignes dans les tables respectives.  
+2. **Lecture (FindById, FindAll, autres FindBy...) :**  
+   * **findById(Long id) Attendu :** Retourne un Optional contenant l'entité si un enregistrement avec l'ID spécifié existe, sinon un Optional vide. Les logs Hibernate devraient afficher une requête SELECT ... WHERE id=?.  
+   * **findAll() Attendu :** Retourne une List de toutes les entités présentes dans la table correspondante. Si JOIN FETCH est utilisé (comme pour LieuRechargeDaoImpl.findAll()), les collections associées (ex: bornes pour LieuRecharge) devraient être initialisées et accessibles sans LazyInitializationException. Les logs Hibernate devraient afficher une requête SELECT ....  
+   * **findByEmail(String email) (pour UtilisateurDao) Attendu :** Retourne un Optional de l'utilisateur correspondant à l'email (unique).  
+   * **findByNom(String nom) (pour LieuRechargeDao) Attendu :** Retourne une List des lieux dont le nom correspond (potentiellement avec JOIN FETCH pour les bornes).  
+   * **findByLieu(LieuRecharge lieu), findByEtat(EtatBorne etat) (pour BorneRechargeDao) Attendu :** Retournent des listes filtrées de bornes.  
+   * **findByUtilisateur(Utilisateur u), findByBorne(BorneRecharge b), findReservationsChevauchantesPourBorne(...) (pour ReservationDao) Attendu :** Retournent des listes filtrées de réservations.  
+   * **Vérification :** Affichage des entités récupérées sur la console. Les données affichées doivent correspondre à ce qui a été persisté.  
+3. **Mise à jour (SaveOrUpdate avec un objet existant modifié) :**  
+   * **Attendu :** Les modifications apportées à un objet entité (préalablement chargé ou un nouvel objet avec un ID existant) sont persistées en base de données après l'appel à saveOrUpdate(). Les logs Hibernate devraient afficher les requêtes UPDATE correspondantes.  
+   * **Vérification :** Rechargement de l'entité depuis la base de données (via findById) et vérification que les champs ont bien les nouvelles valeurs. Consultation directe de la base de données.  
+4. **Suppression (Delete, DeleteById) :**  
+   * **Attendu :** L'enregistrement correspondant à l'entité ou à l'ID spécifié est supprimé de la base de données. Si des relations sont configurées avec CascadeType.ALL et orphanRemoval=true (par exemple, LieuRecharge vers BorneRecharge, ou Utilisateur vers Reservation), les entités dépendantes devraient également être supprimées. Les logs Hibernate devraient afficher les requêtes DELETE correspondantes.  
+   * **Vérification :** Tentative de rechargement de l'entité supprimée (devrait retourner Optional.empty()). Consultation directe de la base de données pour confirmer la disparition de la ligne. Vérification que les entités en cascade ont aussi été supprimées.
+
+En résumé, l'exécution de App.java doit montrer que chaque méthode DAO interagit correctement avec la base de données MySQL via Hibernate, en créant, lisant, mettant à jour et supprimant des données de manière cohérente et sans erreurs (notamment les LazyInitializationException grâce aux JOIN FETCH et les ConstraintViolationException grâce à une gestion propre du schéma avec create-drop et des données de test uniques).
 
 ## **Partie Core Terminée**
 
@@ -26,52 +62,11 @@ La partie "core" du projet, telle que définie par le cahier des charges du TP H
   * Les interfaces DAO pour chaque entité sont définies.  
   * Les implémentations DAO pour chaque entité, utilisant Hibernate pour les opérations CRUD (Create, Read, Update, Delete) de base, sont réalisées.  
 * **Configuration Hibernate :** La configuration pour la connexion à la base de données (MySQL, comme indiqué dans vos logs récents) et la gestion de la SessionFactory sont en place.  
-* **Démonstration :** Une classe principale (Main.java ou App.java) permet de tester les opérations CRUD de base.
-
-*(Note : L'intégration du menu console de l'exercice précédent n'est pas encore finalisée dans cette version du README, car nous nous concentrons sur les exigences du TP Hibernate.)*
-
-## **Bonus Implémentés (Facultatif)**
-
-Conformément au cahier des charges du "TP Java Hibernate \- Évaluation DAO ORM", les fonctionnalités bonus suivantes **n'ont pas encore été implémentées** dans la version actuelle du code :
-
-* Pas de filtrage avancé des réservations (par date, par utilisateur trié par date, etc.) au-delà des recherches de base par DAO.  
-* Pas de gestion spécifique des tarifs ou de leur historique.  
-* Pas de fonctionnalités avancées d'interface utilisateur au-delà des tests CRUD dans la classe Main.
-
-*(Cette section est à mettre à jour si des bonus du TP Hibernate sont implémentés.)*
+* **Démonstration :** Une classe principale App.java permet de tester les opérations CRUD de base.
 
 ## **Compilation et Exécution (avec Maven)**
 
-1. **Prérequis :**  
+**Prérequis :**  
    * JDK 11 ou supérieur.  
    * Apache Maven installé et configuré dans votre PATH.  
-   * Un serveur de base de données MySQL accessible (par exemple, via Docker, comme configuré dans votre hibernate.cfg.xml). Assurez-vous que le service MySQL est démarré.  
-2. **Configuration de la Base de Données :**  
-   * Vérifiez et mettez à jour les informations de connexion (URL, utilisateur, mot de passe) dans le fichier src/main/resources/hibernate.cfg.xml pour correspondre à votre environnement MySQL.  
-   * Assurez-vous que la base de données spécifiée dans l'URL (par exemple, testdb) existe ou que l'option createDatabaseIfNotExist=true est présente dans l'URL JDBC et que l'utilisateur a les droits nécessaires.  
-3. **Compilation :**  
-   * Ouvrez un terminal ou une invite de commande à la racine de votre projet Maven (là où se trouve le fichier pom.xml).  
-   * Exécutez la commande Maven pour nettoyer et compiler le projet, et créer le package (JAR) :  
-     mvn clean package
-
-4. **Exécution :**  
-   * Après une compilation réussie, vous pouvez exécuter l'application (la classe Main ou App) de plusieurs manières :  
-     * **Via Maven (si le plugin exec-maven-plugin est configuré dans le pom.xml) :**  
-       mvn exec:java
-
-     * Directement avec la commande java (après mvn package) :  
-       Le JAR sera créé dans le dossier target/. Par exemple, si votre artifactId est electricity-business-tp-hibernate et la version 1.0-SNAPSHOT, le JAR sera target/electricity-business-tp-hibernate-1.0-SNAPSHOT.jar.  
-       java \-jar target/electricity-business-tp-hibernate-1.0-SNAPSHOT.jar
-
-       *(Assurez-vous que votre pom.xml configure correctement la classe principale dans le manifeste du JAR si vous utilisez cette méthode, ou spécifiez-la avec \-cp et le nom complet de la classe).*  
-5. **Vérification :**  
-   * Observez la console pour les logs Hibernate (y compris les requêtes SQL si show\_sql est activé) et les messages de votre classe Main/App.  
-   * Vérifiez l'état de votre base de données MySQL pour confirmer que les tables ont été créées et que les données ont été insérées/modifiées/supprimées comme prévu.
-
-## **Livrables Attendus (selon demande initiale adaptée au TP)**
-
-* **Code source complet (src/)**: Incluant les entités, DAO, utilitaires, et la classe principale.  
-* **Fichier pom.xml**: Pour la gestion du projet Maven.  
-* **Fichier hibernate.cfg.xml**: Pour la configuration d'Hibernate.  
-* **Ce fichier README.md**: Documentant le projet.  
-* **(Optionnel) Dossier exports/**: Non applicable pour le TP Hibernate, sauf si une fonctionnalité de génération de fichier est explicitement ajoutée.
+   * Un serveur de base de données MySQL accessible (via Docker, configuré avec hibernate.cfg.xml). Assurez-vous que le service MySQL est démarré.
