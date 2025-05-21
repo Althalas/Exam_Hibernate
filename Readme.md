@@ -64,9 +64,8 @@ La partie "core" du projet, telle que définie par le cahier des charges du TP H
 * **Configuration Hibernate :** La configuration pour la connexion à la base de données (MySQL, comme indiqué dans vos logs récents) et la gestion de la SessionFactory sont en place.  
 * **Démonstration :** Une classe principale App.java permet de tester les opérations CRUD de base.
 
-## **Compilation et Exécution (avec Maven)**
+## **Prérequis**
 
-**Prérequis :**  
    * JDK 11 ou supérieur.  
-   * Apache Maven installé et configuré dans votre PATH.  
-   * Un serveur de base de données MySQL accessible (via Docker, configuré avec hibernate.cfg.xml). Assurez-vous que le service MySQL est démarré.
+   * Apache Maven installé et configuré dans le PATH.
+   * Un serveur de base de données MySQL accessible (via Docker, configuré avec hibernate.cfg.xml). Vérifier que le service MySQL est démarré.
